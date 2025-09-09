@@ -129,20 +129,55 @@ def depthFirstSearch(problem:SearchProblem)->List[Direction]:
 def breadthFirstSearch(problem:SearchProblem)->List[Direction]:
     """Search the shallowest nodes in the search tree first."""
 
+    from util import Queue
 
-    '''
-        INSÉREZ VOTRE SOLUTION À LA QUESTION 2 ICI
-    '''
+    #File FIFO des noeuds à explorer
+    frontier = Queue()
+    #état initial avec un chemin vide
+    frontier.push((problem.getStartState(), []))
+    #Ensemble des états visités
+    visited = set()
+
+    while not frontier.isEmpty():
+        state, path = frontier.pop()
+
+        #Vérification si but atteint
+        if problem.isGoalState(state):
+            return path
+
+        if state not in visited:
+            visited.add(state)
+
+            #Ajouter successeurs
+            for successor, action, cost in problem.getSuccessors(state):
+                if successor not in visited:
+                    frontier.push((successor, path + [action]))
 
     util.raiseNotDefined()
 
 def uniformCostSearch(problem:SearchProblem)->List[Direction]:
     """Search the node of least total cost first."""
 
+    from util import PriorityQueue
 
-    '''
-        INSÉREZ VOTRE SOLUTION À LA QUESTION 3 ICI
-    '''
+    frontier = PriorityQueue()
+    frontier.push((problem.getStartState(), [], 0), 0)  # (état, chemin, coûtTotal)
+    visited = {}
+
+    while not frontier.isEmpty():
+        state, path, cost = frontier.pop()
+
+        #Vérification si but atteint
+        if problem.isGoalState(state):
+            return path
+
+        #Vérifie si état non visité ou trouvé à moindre coût
+        if state not in visited or cost < visited[state]:
+            visited[state] = cost
+
+            for successor, action, stepCost in problem.getSuccessors(state):
+                newCost = cost + stepCost
+                frontier.push((successor, path + [action], newCost), newCost)
 
     util.raiseNotDefined()
 
@@ -155,9 +190,28 @@ def nullHeuristic(state:GameState, problem:SearchProblem=None)->List[Direction]:
 
 def aStarSearch(problem:SearchProblem, heuristic=nullHeuristic)->List[Direction]:
     """Search the node that has the lowest combined cost and heuristic first."""
-    '''
-        INSÉREZ VOTRE SOLUTION À LA QUESTION 4 ICI
-    '''
+    from util import PriorityQueue
+
+    #File de priorité (clé = coût + heuristique)
+    frontier = PriorityQueue()
+    start = problem.getStartState()
+    frontier.push((start, [], 0), heuristic(start, problem))
+    visited = {}
+
+    while not frontier.isEmpty():
+        state, path, cost = frontier.pop()
+
+        if problem.isGoalState(state):
+            return path
+
+        #Vérifie si état non visité ou trouvé à moindre coût
+        if state not in visited or cost < visited[state]:
+            visited[state] = cost
+
+            for successor, action, stepCost in problem.getSuccessors(state):
+                newCost = cost + stepCost
+                priority = newCost + heuristic(successor, problem)
+                frontier.push((successor, path + [action], newCost), priority)
 
     util.raiseNotDefined()
 
