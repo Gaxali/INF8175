@@ -96,25 +96,33 @@ def depthFirstSearch(problem:SearchProblem)->List[Direction]:
     print("Start's successors:", problem.getSuccessors(problem.getStartState()))
     """
 
-    from game import Directions
     from util import Stack
 
-    n = Directions.NORTH
-    e = Directions.EAST
-    s = Directions.SOUTH
-    w = Directions.WEST
+    #Pile LIFO des noeuds à explorer
+    frontier = Stack()
+    #état initial avec un chemin vide
+    frontier.push((problem.getStartState(), []))
+    #Ensemble des états visités
+    visited = set()
 
-    directions = []
+    while not frontier.isEmpty():
+        state, path = frontier.pop()
 
-    stack = Stack(problem.getStartState)
+        #Si état déjà exploré, on ignore
+        if state in visited:
+            continue
 
-    while (not stack.isEmpty()):
-        currentState = stack.pop()
-        if problem.isGoalState(currentState):
-            return directions
-        for successor in problem.getSuccessors(currentState):
+        #Vérification si but atteint
+        if problem.isGoalState(state):
+            return path
 
-
+        #Marque l’état comme visité
+        visited.add(state)
+        # et ajouter successeurs
+        for successor, action, cost in problem.getSuccessors(state):
+            if successor not in visited:
+                frontier.push((successor, path + [action]))
+                
     util.raiseNotDefined()
 
 
