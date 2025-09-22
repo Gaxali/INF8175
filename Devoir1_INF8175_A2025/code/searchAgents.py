@@ -336,7 +336,7 @@ class CornersProblem(search.SearchProblem):
                     if (nextx, nexty) == corner:
                         newCornersStatus[idx] = True
                 nextState = ((nextx, nexty), tuple(newCornersStatus))
-                successors.append( ( nextState, action, 1) )
+                successors.append((nextState, action, 1) )
 
 
         self._expanded += 1 # DO NOT CHANGE
@@ -355,6 +355,12 @@ class CornersProblem(search.SearchProblem):
             if self.walls[x][y]: return 999999
         return len(actions)
 
+def euclidian_distance(pos1, pos2):
+    x1, y1 = pos1
+    x2, y2 = pos2
+
+    return ((x2-x1)**2+(y2-y1)**2)**(1/2)
+    
 def cornersHeuristic(state, problem):
     """
     A heuristic for the CornersProblem that you defined.
@@ -371,11 +377,17 @@ def cornersHeuristic(state, problem):
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
 
-    '''
-        INSÉREZ VOTRE SOLUTION À LA QUESTION 6 ICI
-    '''
-    
-    return 0
+    position, corners_status = state
+
+    dist_min = 999999
+    for idx, corner in enumerate(corners):
+        dist = euclidian_distance(position, corner)
+        if (dist < dist_min & corners_status[idx] == False):
+            dist_min = dist
+
+    return dist_min
+
+
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
