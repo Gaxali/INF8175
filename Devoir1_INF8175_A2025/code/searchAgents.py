@@ -374,18 +374,43 @@ def cornersHeuristic(state, problem):
     shortest path from the state to a goal of the problem; i.e.  it should be
     admissible (as well as consistent).
     """
-    corners = problem.corners # These are the corner coordinates
-    walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
+    #coins du labyrinthe
+    corners = problem.corners
 
-    position, corners_status = state
+    #(position actuelle de Pacman, coins visités)
+    position, visited = state
 
-    dist_min = 999999
-    for idx, corner in enumerate(corners):
-        dist = euclidian_distance(position, corner)
-        if (dist < dist_min & corners_status[idx] == False):
-            dist_min = dist
+    #On récupère les coins qui n'ont pas encore été visités
+    unvisited = []
+    for i, corner in enumerate(corners):
+        if not visited[i]:
+            unvisited.append(corner)
 
-    return dist_min
+    #Si tous les coins ont déjà été visités, il reste 0 de coût
+    if not unvisited:
+        return 0
+
+    #Distance de Pacman vers chaque coin non visité
+    pacman_to_corners = []
+    for corner in unvisited:
+        distance = util.manhattanDistance(position, corner)
+        pacman_to_corners.append(distance)
+
+    #Distances entre toutes les paires de coins non visités
+    corners_pairwise = []
+    for c1 in unvisited:
+        for c2 in unvisited:
+            distance = util.manhattanDistance(c1, c2)
+            corners_pairwise.append(distance)
+
+    #Si la liste est vide, on met 0 (exemple : un seul coin non visité)
+    if corners_pairwise:
+        max_corner_dist = max(corners_pairwise)
+    else:
+        max_corner_dist = 0
+
+    # Heuristique = distance vers le coin le plus proche + distance max entre deux coins non visités
+    return min(pacman_to_corners) + max_corner_dist
 
 
 
