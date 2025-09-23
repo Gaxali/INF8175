@@ -506,10 +506,16 @@ def foodHeuristic(state, problem: FoodSearchProblem):
     """
     position, foodGrid = state
 
-    '''
-        INSÉREZ VOTRE SOLUTION À LA QUESTION 7 ICI
-    '''
+    foodList = foodGrid.asList()
 
+    #Si tout est mangé
+    if not foodList:
+        return 0
 
-    return 0
-
+    #Distance maximale entre Pacman et un point de nourriture
+    maxDist = 0
+    for food in foodList:
+        dist = abs(position[0] - food[0]) + abs(position[1] - food[1])  # distance Manhattan
+        if dist > maxDist:
+            maxDist = dist
+    return maxDist
