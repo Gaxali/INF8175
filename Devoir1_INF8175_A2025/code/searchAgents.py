@@ -476,6 +476,29 @@ class AStarFoodSearchAgent(SearchAgent):
         self.searchFunction = lambda prob: search.aStarSearch(prob, foodHeuristic)
         self.searchType = FoodSearchProblem
 
+def mazeDistance(point1, point2, gameState):
+    from util import Queue
+
+    walls = gameState.getWalls()
+    if point1 == point2:
+        return 0
+
+    queue = Queue()
+    queue.push((point1, 0))
+    visited = set()
+    visited.add(point1)
+
+    while not queue.isEmpty():
+        currentPos, dist = queue.pop()
+        if currentPos == point2:
+            return dist
+
+        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+            nextPos = (currentPos[0]+dx, currentPos[1]+dy)
+            if nextPos not in visited and not walls[nextPos[0]][nextPos[1]]:
+                visited.add(nextPos)
+                queue.push((nextPos, dist+1))
+
 def foodHeuristic(state, problem: FoodSearchProblem):
     """
     Your heuristic for the FoodSearchProblem goes here.
@@ -505,24 +528,20 @@ def foodHeuristic(state, problem: FoodSearchProblem):
     problem.heuristicInfo['wallCount']
     """
     position, foodGrid = state
-
     foodList = foodGrid.asList()
 
-    #Si tout est mangé
     if not foodList:
         return 0
 
-    #Distance maximale entre Pacman et un point de nourriture
-    minDist = 999999
-    maxFoodDist = 0
-    for food_1 in foodList:
-        dist = abs(position[0] - food_1[0]) + abs(position[1] - food_1[1])  # distance Manhattan
-        if dist < minDist:
-            minDist = dist
+    problem.heuristicInfo['distances'] = {}
 
-        for food_2 in foodList:
-            foodDist = abs(food_2[0] - food_1[0]) + abs(food_2[1] - food_1[1]) # distance de Manhattan entre les deux nourritures
-            if foodDist > maxFoodDist:
-                maxFoodDist = foodDist
+    maxDistance = 0
+    for food in foodList:
+        key = (position, food)
+        if key not in problem.heuristicInfo['distances']:
+            problem.heuristicInfo['distances'][key] = mazeDistance(position, food, problem.startingGameState)
+        dist = problem.heuristicInfo['distances'][key]
+        if dist > maxDistance:
+            maxDistance = dist
 
-    return minDist + maxFoodDist
+    return maxDistance
