@@ -215,7 +215,6 @@ def aStarSearch(problem:SearchProblem, heuristic=nullHeuristic)->List[Direction]
 
     util.raiseNotDefined()
 
-
 # Abbreviations
 bfs = breadthFirstSearch
 dfs = depthFirstSearch

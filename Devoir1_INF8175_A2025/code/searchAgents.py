@@ -513,9 +513,16 @@ def foodHeuristic(state, problem: FoodSearchProblem):
         return 0
 
     #Distance maximale entre Pacman et un point de nourriture
-    maxDist = 0
-    for food in foodList:
-        dist = abs(position[0] - food[0]) + abs(position[1] - food[1])  # distance Manhattan
-        if dist > maxDist:
-            maxDist = dist
-    return maxDist
+    minDist = 999999
+    maxFoodDist = 0
+    for food_1 in foodList:
+        dist = abs(position[0] - food_1[0]) + abs(position[1] - food_1[1])  # distance Manhattan
+        if dist < minDist:
+            minDist = dist
+
+        for food_2 in foodList:
+            foodDist = abs(food_2[0] - food_1[0]) + abs(food_2[1] - food_1[1]) # distance de Manhattan entre les deux nourritures
+            if foodDist > maxFoodDist:
+                maxFoodDist = foodDist
+
+    return minDist + maxFoodDist
