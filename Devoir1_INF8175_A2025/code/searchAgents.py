@@ -477,27 +477,35 @@ class AStarFoodSearchAgent(SearchAgent):
         self.searchType = FoodSearchProblem
 
 def mazeDistance(point1, point2, gameState):
+    "Calcule la distance réelle entre deux points du labyrinthe en utilisant BFS"
     from util import Queue
 
     walls = gameState.getWalls()
     if point1 == point2:
         return 0
 
-    queue = Queue()
-    queue.push((point1, 0))
+    #File FIFO des noeuds à explorer
+    frontier = Queue()
+    #état initial avec une distance nulle
+    frontier.push((point1, 0))
+    #Ensemble des états visités
     visited = set()
     visited.add(point1)
 
-    while not queue.isEmpty():
-        currentPos, dist = queue.pop()
+    while not frontier.isEmpty():
+        currentPos, dist = frontier.pop()
+
+        #Vérification si but atteint
         if currentPos == point2:
             return dist
 
+        #Test de toutes les directions
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
             nextPos = (currentPos[0]+dx, currentPos[1]+dy)
+            #Ajouter successeurs
             if nextPos not in visited and not walls[nextPos[0]][nextPos[1]]:
                 visited.add(nextPos)
-                queue.push((nextPos, dist+1))
+                frontier.push((nextPos, dist+1))
 
 def foodHeuristic(state, problem: FoodSearchProblem):
     """
@@ -533,15 +541,20 @@ def foodHeuristic(state, problem: FoodSearchProblem):
     if not foodList:
         return 0
 
+    #Initialisation du dictionnaire des distances avec comme clé la position de Pacman et de la nourriture
     problem.heuristicInfo['distances'] = {}
 
     maxDistance = 0
     for food in foodList:
         key = (position, food)
+        #Vérifie si la distance est déjà calculée
         if key not in problem.heuristicInfo['distances']:
+            #Calcule et insère dans le dictionnaire la distance (le calcul prend beaucoup de tempsg)
             problem.heuristicInfo['distances'][key] = mazeDistance(position, food, problem.startingGameState)
+
         dist = problem.heuristicInfo['distances'][key]
         if dist > maxDistance:
             maxDistance = dist
 
+    #Renvoie la distance maximale entre Pacman et un point de nourriture
     return maxDistance
