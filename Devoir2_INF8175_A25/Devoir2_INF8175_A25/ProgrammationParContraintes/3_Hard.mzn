@@ -49,6 +49,45 @@ var int: temps_trajet;
 % Partie étudiant
 %-----------------------------------------------------------------------------%
 
+% Toutes les villes visitées une seule fois (sauf la dernière = ville 1)
+constraint all_different(chemin_tournee[1..n]);
+
+% La dernière ville visitée est la ville 1
+constraint chemin_tournee[n] = 1;
+
+% Construction du circuit : successeur exact pour chaque ville
+% Pour toutes les villes sauf la dernière avant retour
+constraint forall(i in 1..n-2) (
+    circuit_tournee[chemin_tournee[i]] = chemin_tournee[i+1]
+);
+
+% Successeur de la dernière ville avant retour = ville 1
+constraint circuit_tournee[chemin_tournee[n-1]] = 1;
+
+% Calcul du temps cumulé et temps d'attente
+constraint cumul_temps[1] = distance[1, chemin_tournee[1]] +
+                            max(0, fenetre_arrivee[chemin_tournee[1],1] - distance[1, chemin_tournee[1]]);
+constraint temps_attente[1] = max(0, fenetre_arrivee[chemin_tournee[1],1] - distance[1, chemin_tournee[1]]);
+constraint cumul_temps[1] <= fenetre_arrivee[chemin_tournee[1],2];
+
+constraint forall(i in 2..n) (
+    let {
+        var int: prev = chemin_tournee[i-1],
+        var int: curr = chemin_tournee[i],
+        var int: raw_arrival = cumul_temps[i-1] + distance[prev, curr]
+    } in
+    temps_attente[i] = max(0, fenetre_arrivee[curr,1] - raw_arrival) /\
+    cumul_temps[i] = raw_arrival + temps_attente[i] /\
+    cumul_temps[i] <= fenetre_arrivee[curr,2]
+);
+
+% Temps total de la tournée
+constraint temps_trajet = cumul_temps[n];
+
+% Temps d'attente total
+constraint total_temps_attentes = sum(temps_attente);
+
+solve minimize temps_trajet;
 
 %-----------------------------------------------------------------------------%
 
