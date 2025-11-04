@@ -1,5 +1,6 @@
-% NOM_ETUDIANT_1 (MATRICULE_1)
-% NOM_ETUDIANT_2 (MATRICULE_2)
+% BROCHU (2095018)
+% LESOURD (2488094)
+
 
 include "globals.mzn"; 
 

@@ -1,5 +1,5 @@
-% NOM_ETUDIANT_1 (MATRICULE_1)
-% NOM_ETUDIANT_2 (MATRICULE_2)
+% BROCHU (2095018)
+% LESOURD (2488094)
 
 include "globals.mzn";
 
@@ -24,7 +24,18 @@ var int: p;
 % Partie étudiant
 %-----------------------------------------------------------------------------%
 
+constraint chiffres[4] mod 2 = 0;
+constraint forall(i in 1..4) (chiffres[i] != 0);
+constraint alldifferent(chiffres);
+constraint chiffres[1] > chiffres[2];
+constraint chiffres[3] < chiffres[4];
+constraint chiffres[2] > chiffres[4];
+constraint sum(chiffres) > 15;
 
+p = chiffres[2] * chiffres[3] * chiffres[4];
+solve minimize p;
+
+nombre = chiffres[1]*1000 + chiffres[2]*100 + chiffres[3]*10 + chiffres[4];
 %-----------------------------------------------------------------------------%
 
 output [
