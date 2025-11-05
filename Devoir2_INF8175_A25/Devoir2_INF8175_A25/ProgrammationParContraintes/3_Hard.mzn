@@ -1,7 +1,6 @@
 % BROCHU (2095018)
 % LESOURD (2488094)
 
-
 include "globals.mzn"; 
 
 %-----------------------------------------------------------------------------%
@@ -57,10 +56,13 @@ constraint all_different(chemin_tournee[1..n]);
 constraint chemin_tournee[n] = 1;
 
 % Construction du circuit : successeur exact pour chaque ville
-% Pour toutes les villes sauf la dernière avant retour
+% Pour toutes les villes sauf la première et la dernière avant retour
 constraint forall(i in 1..n-2) (
     circuit_tournee[chemin_tournee[i]] = chemin_tournee[i+1]
 );
+
+% Successeur de la ville 1 est la première ville du chemin
+constraint circuit_tournee[1] = chemin_tournee[1];
 
 % Successeur de la dernière ville avant retour = ville 1
 constraint circuit_tournee[chemin_tournee[n-1]] = 1;

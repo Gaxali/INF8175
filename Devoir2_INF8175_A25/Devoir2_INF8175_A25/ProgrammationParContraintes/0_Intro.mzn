@@ -32,10 +32,11 @@ constraint chiffres[3] < chiffres[4];
 constraint chiffres[2] > chiffres[4];
 constraint sum(chiffres) > 15;
 
-p = chiffres[2] * chiffres[3] * chiffres[4];
+constraint p = chiffres[2] * chiffres[3] * chiffres[4];
+constraint nombre = chiffres[1]*1000 + chiffres[2]*100 + chiffres[3]*10 + chiffres[4];
+
 solve minimize p;
 
-nombre = chiffres[1]*1000 + chiffres[2]*100 + chiffres[3]*10 + chiffres[4];
 %-----------------------------------------------------------------------------%
 
 output [
