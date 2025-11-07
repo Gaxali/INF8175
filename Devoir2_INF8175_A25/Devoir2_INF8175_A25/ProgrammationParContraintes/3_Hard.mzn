@@ -59,9 +59,10 @@ constraint chemin_tournee[n] = 1;
 constraint forall(i in 1..n-1) (
     circuit_tournee[chemin_tournee[i]] = chemin_tournee[i+1]
 );
-constraint circuit_tournee[chemin_tournee[n]] = 1;
+constraint circuit_tournee[1] = chemin_tournee[1];
 
-% Calcul du temps cumulé et temps d'attente 
+
+% Calcul du temps cumulé et temps d'attente - CORRIGÉ
 % Pour la première ville visitée (index 1 du chemin)
 constraint cumul_temps[1] = distance[1, chemin_tournee[1]];
 constraint temps_attente[chemin_tournee[1]] = max(0, fenetre_arrivee[chemin_tournee[1],1] - cumul_temps[1]);
@@ -72,22 +73,21 @@ constraint forall(i in 2..n-1) (
     let {
         var int: ville_prev = chemin_tournee[i-1],
         var int: ville_curr = chemin_tournee[i],
-        % CORRECTION : Le temps de départ = arrivée précédente + attente précédente
-        var int: depart_prev = cumul_temps[i-1] + temps_attente[ville_prev],
-        var int: arrivee_brute = depart_prev + distance[ville_prev, ville_curr]
+        % SEUL CHANGEMENT : Ajout de temps_attente[ville_prev] dans le calcul
+        var int: arrivee_brute = cumul_temps[i-1] + temps_attente[ville_prev] + distance[ville_prev, ville_curr]
     } in
     temps_attente[ville_curr] = max(0, fenetre_arrivee[ville_curr,1] - arrivee_brute) /\
     cumul_temps[i] = arrivee_brute + temps_attente[ville_curr] /\
-    cumul_temps[i] + temps_attente[ville_curr] <= fenetre_arrivee[ville_curr,2]
+    cumul_temps[i] <= fenetre_arrivee[ville_curr,2]
 );
 
-% Pour le retour à la ville 1 (dernière étape)
+% Pour le retour à la ville 1 (dernière étape) - UNIQUEMENT CETTE LIGNE MODIFIÉE
 constraint let {
         var int: derniere_ville = chemin_tournee[n-1],
-        var int: depart_derniere = cumul_temps[n-1] + temps_attente[derniere_ville],
-        var int: arrivee_finale = depart_derniere + distance[derniere_ville, 1]
+        % SEUL CHANGEMENT : Ajout de temps_attente[derniere_ville] dans le calcul
+        var int: arrivee_finale = cumul_temps[n-1] + temps_attente[derniere_ville] + distance[derniere_ville, 1]
     } in (
-        temps_attente[1] = 0 /\  % Pas d'attente pour le retour
+        temps_attente[1] = 0 /\
         cumul_temps[n] = arrivee_finale /\
         temps_trajet = cumul_temps[n]
     );
