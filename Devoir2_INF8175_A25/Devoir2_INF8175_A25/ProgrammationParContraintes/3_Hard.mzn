@@ -50,45 +50,50 @@ var int: temps_trajet;
 %-----------------------------------------------------------------------------%
 
 % Toutes les villes visitées une seule fois (sauf la dernière = ville 1)
-constraint all_different(chemin_tournee[1..n]);
+constraint all_different(chemin_tournee);
 
 % La dernière ville visitée est la ville 1
 constraint chemin_tournee[n] = 1;
 
 % Construction du circuit : successeur exact pour chaque ville
-% Pour toutes les villes sauf la première et la dernière avant retour
-constraint forall(i in 1..n-2) (
+constraint forall(i in 1..n-1) (
     circuit_tournee[chemin_tournee[i]] = chemin_tournee[i+1]
 );
+constraint circuit_tournee[chemin_tournee[n]] = 1;
 
-% Successeur de la ville 1 est la première ville du chemin
-constraint circuit_tournee[1] = chemin_tournee[1];
+% Calcul du temps cumulé et temps d'attente 
+% Pour la première ville visitée (index 1 du chemin)
+constraint cumul_temps[1] = distance[1, chemin_tournee[1]];
+constraint temps_attente[chemin_tournee[1]] = max(0, fenetre_arrivee[chemin_tournee[1],1] - cumul_temps[1]);
+constraint cumul_temps[1] + temps_attente[chemin_tournee[1]] <= fenetre_arrivee[chemin_tournee[1],2];
 
-% Successeur de la dernière ville avant retour = ville 1
-constraint circuit_tournee[chemin_tournee[n-1]] = 1;
-
-% Calcul du temps cumulé et temps d'attente
-constraint cumul_temps[1] = distance[1, chemin_tournee[1]] +
-                            max(0, fenetre_arrivee[chemin_tournee[1],1] - distance[1, chemin_tournee[1]]);
-constraint temps_attente[1] = max(0, fenetre_arrivee[chemin_tournee[1],1] - distance[1, chemin_tournee[1]]);
-constraint cumul_temps[1] <= fenetre_arrivee[chemin_tournee[1],2];
-
-constraint forall(i in 2..n) (
+% Pour les villes suivantes
+constraint forall(i in 2..n-1) (
     let {
-        var int: prev = chemin_tournee[i-1],
-        var int: curr = chemin_tournee[i],
-        var int: raw_arrival = cumul_temps[i-1] + distance[prev, curr]
+        var int: ville_prev = chemin_tournee[i-1],
+        var int: ville_curr = chemin_tournee[i],
+        % CORRECTION : Le temps de départ = arrivée précédente + attente précédente
+        var int: depart_prev = cumul_temps[i-1] + temps_attente[ville_prev],
+        var int: arrivee_brute = depart_prev + distance[ville_prev, ville_curr]
     } in
-    temps_attente[i] = max(0, fenetre_arrivee[curr,1] - raw_arrival) /\
-    cumul_temps[i] = raw_arrival + temps_attente[i] /\
-    cumul_temps[i] <= fenetre_arrivee[curr,2]
+    temps_attente[ville_curr] = max(0, fenetre_arrivee[ville_curr,1] - arrivee_brute) /\
+    cumul_temps[i] = arrivee_brute + temps_attente[ville_curr] /\
+    cumul_temps[i] + temps_attente[ville_curr] <= fenetre_arrivee[ville_curr,2]
 );
 
-% Temps total de la tournée
-constraint temps_trajet = cumul_temps[n];
+% Pour le retour à la ville 1 (dernière étape)
+constraint let {
+        var int: derniere_ville = chemin_tournee[n-1],
+        var int: depart_derniere = cumul_temps[n-1] + temps_attente[derniere_ville],
+        var int: arrivee_finale = depart_derniere + distance[derniere_ville, 1]
+    } in (
+        temps_attente[1] = 0 /\  % Pas d'attente pour le retour
+        cumul_temps[n] = arrivee_finale /\
+        temps_trajet = cumul_temps[n]
+    );
 
 % Temps d'attente total
-constraint total_temps_attentes = sum(temps_attente);
+constraint total_temps_attentes = sum(i in 1..n)(temps_attente[i]);
 
 solve minimize temps_trajet;
 
