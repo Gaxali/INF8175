@@ -244,16 +244,29 @@ class MyPlayer(PlayerHex):
                     if board[cand[0]][cand[1]] != 0:
                         self._center_played = True
 
-            # B reacting to single R move: place on R's column ~4 towards center
+            # B reacting to opponent's first move
             elif my == "B" and occupied == 1:
                 opp_cells = [(i, j) for i in range(size) for j in range(size) if board[i][j] == opp]
                 if opp_cells:
                     oi, oj = opp_cells[0]
                     ci = (size - 1) / 2.0
-                    dir_i = 1 if oi < ci else -1
-                    target_i = oi + 4 * dir_i
-                    target_i = max(0, min(size - 1, int(round(target_i))))
-                    pref = (target_i, oj)
+                    
+                    # DÉTERMINER SI L'ADVERSAIRE A JOUÉ AU CENTRE OU SUR LES CÔTÉS
+                    center_threshold = size * 0.3  # 30% du board depuis le centre
+                    is_opponent_center = (abs(oi - ci) <= center_threshold and 
+                                        abs(oj - ci) <= center_threshold)
+                    
+                    if is_opponent_center:
+                        # Si adversaire au centre : jouer à 4 cases de lui vers le centre
+                        dir_i = 1 if oi < ci else -1
+                        target_i = oi + 4 * dir_i
+                        target_i = max(0, min(size - 1, int(round(target_i))))
+                        pref = (target_i, oj)
+                    else:
+                        # Si adversaire sur les côtés : jouer au centre nous-mêmes
+                        mid = size // 2
+                        pref = (mid, mid)
+                    
                     if 0 <= pref[0] < size and 0 <= pref[1] < size and board[pref[0]][pref[1]] == 0:
                         for a in possible_actions:
                             if action_places_on(a, pref):
@@ -261,6 +274,7 @@ class MyPlayer(PlayerHex):
                                 self._focus_column = oj
                                 self._focus_row = oi
                                 return a
+                    
                     # fallback: central cell closest to pref
                     if central_empty:
                         central_empty.sort(key=lambda c: abs(c[0] - pref[0]) + abs(c[1] - pref[1]))
@@ -288,7 +302,9 @@ class MyPlayer(PlayerHex):
             INF = 10**9
             dist = {}
             prev = {}
+            direction_state = {}  # État de direction pour chaque case
             dq = deque()
+            
             for s in starts:
                 i, j = s
                 if not (0 <= i < size and 0 <= j < size):
@@ -299,16 +315,23 @@ class MyPlayer(PlayerHex):
                 if dist.get((i, j), INF) > cost:
                     dist[(i, j)] = cost
                     prev[(i, j)] = None
+                    direction_state[(i, j)] = True  # Commence avec True = même ligne/colonne
                     if cost == 0:
                         dq.appendleft((i, j))
                     else:
                         dq.append((i, j))
+            
             reached_targets = []
             best_target_cost = INF
+            
             while dq:
                 u = dq.popleft()
+                ui, uj = u
+                current_state = direction_state.get(u, True)
+                
                 if dist.get(u, INF) > best_target_cost:
                     continue
+                    
                 if is_target(u):
                     c = dist.get(u, INF)
                     if c < best_target_cost:
@@ -317,23 +340,53 @@ class MyPlayer(PlayerHex):
                     elif c == best_target_cost:
                         reached_targets.append(u)
                     continue
-                ui, uj = u
+                
                 du = dist.get(u, INF)
+                
                 for di, dj in dirs:
                     vi, vj = ui + di, uj + dj
                     if not (0 <= vi < size and 0 <= vj < size):
                         continue
                     if board[vi][vj] == opp:
                         continue
+                        
+                    # VÉRIFICATION DE LA CONTRAINTE DE DIRECTION
+                    valid_direction = False
+                    
+                    if my == "R":
+                        # R : True = même colonne (même j), False = changer de colonne
+                        if current_state:  # Doit rester sur même colonne
+                            if vj == uj:  # Même colonne
+                                valid_direction = True
+                        else:  # Doit changer de colonne
+                            if vj != uj:  # Colonne différente
+                                valid_direction = True
+                    else:  # "B"
+                        # B : True = même ligne (même i), False = changer de ligne
+                        if current_state:  # Doit rester sur même ligne
+                            if vi == ui:  # Même ligne
+                                valid_direction = True
+                        else:  # Doit changer de ligne
+                            if vi != ui:  # Ligne différente
+                                valid_direction = True
+                    
+                    if not valid_direction:
+                        continue
+                        
                     w = 0 if board[vi][vj] == my else 1
                     nd = du + w
+                    
                     if nd < dist.get((vi, vj), INF):
                         dist[(vi, vj)] = nd
                         prev[(vi, vj)] = (ui, uj)
+                        # ALTERNANCE : Inverse l'état pour la prochaine case
+                        direction_state[(vi, vj)] = not current_state
+                        
                         if w == 0:
                             dq.appendleft((vi, vj))
                         else:
                             dq.append((vi, vj))
+            
             return reached_targets, best_target_cost, prev, dist
 
         # --- préparer deux recherches (sens A et B) ---
@@ -633,4 +686,5 @@ class MyPlayer(PlayerHex):
                     neighbors.append((ni, nj))
 
         return neighbors
+
 
