@@ -148,6 +148,66 @@ class MyPlayer(PlayerHex):
                 except Exception:
                     return False
             return False
+        dirs = [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0)]
+        # --- DÉTECTION PRIORITAIRE DES MENACES DE BRIDGE ADVERSES ---
+        def find_opponent_bridge_threats():
+            """Trouve les pions ADVERSES qui forment actuellement un bridge entre nos pions"""
+            threat_cells = set()
+            
+            for i in range(size):
+                for j in range(size):
+                    if board[i][j] == opp:  # <-- CHANGEMENT ICI : on cherche les pions ADVERSES
+                        # Compter les pions amis adjacents à ce pion adverse
+                        friend_neighbors = []
+                        for di, dj in dirs:
+                            ni, nj = i + di, j + dj
+                            if 0 <= ni < size and 0 <= nj < size and board[ni][nj] == my:
+                                friend_neighbors.append((ni, nj))
+                        
+                        # Si le pion adverse connecte exactement 2 pions amis
+                        if len(friend_neighbors) == 2:
+                            n1_i, n1_j = friend_neighbors[0]
+                            n2_i, n2_j = friend_neighbors[1]
+                            
+                            # Vérifier si ces deux pions amis ne sont pas adjacents entre eux
+                            are_adjacent = False
+                            for di, dj in dirs:
+                                if n1_i + di == n2_i and n1_j + dj == n2_j:
+                                    are_adjacent = True
+                                    break
+                            
+                            if not are_adjacent:
+                                # Ce pion adverse forme un bridge dangereux !
+                                # On doit jouer sur une case qui bloque cette connexion
+                                # Chercher les cases vides entre ces deux pions amis
+                                blocking_cells = set()
+                                
+                                # Chercher les cases qui sont entre les deux pions amis
+                                # Ces cases doivent être adjacentes aux DEUX pions amis
+                                for di1, dj1 in dirs:
+                                    # Case adjacente au premier pion ami
+                                    ci, cj = n1_i + di1, n1_j + dj1
+                                    if 0 <= ci < size and 0 <= cj < size and board[ci][cj] == 0:
+                                        # Vérifier si cette case est aussi adjacente au deuxième pion ami
+                                        for di2, dj2 in dirs:
+                                            if ci == n2_i + di2 and cj == n2_j + dj2:
+                                                # Cette case est adjacente aux DEUX pions amis !
+                                                blocking_cells.add((ci, cj))
+                                
+                                threat_cells |= blocking_cells
+            
+            return threat_cells
+
+        # VÉRIFICATION PRIORITAIRE - AVANT TOUTE AUTRE LOGIQUE
+        threat_cells = find_opponent_bridge_threats()
+        if threat_cells:
+            # Prendre la première menace trouvée (ou on peut choisir une stratégie)
+            desired_threat = random.choice(list(threat_cells))
+            # Trouver l'action correspondante
+            for a in possible_actions:
+                if action_places_on(a, desired_threat):
+                    
+                    return a
 
         # --- cellules centrales utilitaire ---
         def get_central_cells(sz, target=12):
@@ -222,8 +282,7 @@ class MyPlayer(PlayerHex):
                 if board[desired_center[0]][desired_center[1]] != 0:
                     self._center_played = True
 
-        # --- 0-1 BFS helpers (nos pions coût 0, vides coût 1, adversaire bloqué) ---
-        dirs = [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0)]
+      
 
         def bfs_from_starts(starts, is_target):
             INF = 10**9
@@ -320,6 +379,8 @@ class MyPlayer(PlayerHex):
                 for idx, (pi, pj) in enumerate(path):
                     if board[pi][pj] == 0:
                         first_empty_idx = idx
+                        
+
                         # Vérifier si on peut avancer d'une case supplémentaire
                         next_idx = idx + 1
                         if next_idx < len(path):
@@ -392,7 +453,6 @@ class MyPlayer(PlayerHex):
             
             return bridge_candidates
         
-
 
         # --- alternance forcée des côtés (sauf si côté "bien rempli") ---
         def side_fill_count(side_name):
@@ -573,3 +633,4 @@ class MyPlayer(PlayerHex):
                     neighbors.append((ni, nj))
 
         return neighbors
+
