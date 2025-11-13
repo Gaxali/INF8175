@@ -101,6 +101,27 @@ class MyPlayer(PlayerHex):
         if board is None or size == 0:
             return random.choice(possible_actions)
 
+        # --- VÉRIFICATION PRIORITAIRE : VICTOIRE IMMÉDIATE ---
+        def find_winning_move():
+            """Trouve un coup qui fait gagner immédiatement"""
+            for action in possible_actions:
+                try:
+                    next_state = current_state.apply_action(action)
+                    if next_state.is_done():
+                        # Vérifier si c'est nous qui avons gagné
+                        scores = next_state.get_scores()
+                        my_id = self.get_id()
+                        if scores[my_id] > 0:  # Nous avons gagné
+                            return action
+                except Exception:
+                    continue
+            return None
+
+        # Vérifier s'il existe un coup gagnant immédiat
+        winning_action = find_winning_move()
+        if winning_action:
+            return winning_action
+
         my = self.piece_type
         opp = "R" if my == "B" else "B"
         occupied = sum(1 for row in board for c in row if c != 0)
@@ -225,8 +246,12 @@ class MyPlayer(PlayerHex):
             # R premier coup -> choisir une cellule "centrée mais orientée" vers notre objectif
             if my == "R" and occupied == 0:
                 mid = size // 2
-                # préférence pour avancer rapidement : 4 lignes vers notre bord (bas)
-                pref = (min(size - 1, mid + 4), mid)
+
+                central_options = [(mid, mid), (mid+1, mid), (mid-1, mid), (mid, mid+1), (mid, mid-1)]
+                random.shuffle(central_options)
+                
+                pref = central_options[0]
+                
                 if 0 <= pref[0] < size and 0 <= pref[1] < size and board[pref[0]][pref[1]] == 0:
                     for a in possible_actions:
                         if action_places_on(a, pref):
@@ -686,4 +711,3 @@ class MyPlayer(PlayerHex):
                     neighbors.append((ni, nj))
 
         return neighbors
-
