@@ -25,6 +25,7 @@ class MyPlayer(PlayerHex):
         self._center_needed = 3            # nb de pions dans corridor pour quitter phase centre
         self._focus_column = None
         self._focus_row = None
+        
 
     def compute_action(self, current_state: GameState, remaining_time: float = 1e9, **kwargs) -> Action:
         try:
@@ -101,6 +102,27 @@ class MyPlayer(PlayerHex):
         if board is None or size == 0:
             return random.choice(possible_actions)
 
+        # --- VÉRIFICATION PRIORITAIRE : VICTOIRE IMMÉDIATE ---
+        def find_winning_move():
+            """Trouve un coup qui fait gagner immédiatement"""
+            for action in possible_actions:
+                try:
+                    next_state = current_state.apply_action(action)
+                    if next_state.is_done():
+                        # Vérifier si c'est nous qui avons gagné
+                        scores = next_state.get_scores()
+                        my_id = self.get_id()
+                        if scores[my_id] > 0:  # Nous avons gagné
+                            return action
+                except Exception:
+                    continue
+            return None
+
+        # Vérifier s'il existe un coup gagnant immédiat
+        winning_action = find_winning_move()
+        if winning_action:
+            return winning_action
+
         my = self.piece_type
         opp = "R" if my == "B" else "B"
         occupied = sum(1 for row in board for c in row if c != 0)
@@ -148,66 +170,6 @@ class MyPlayer(PlayerHex):
                 except Exception:
                     return False
             return False
-        dirs = [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0)]
-        # --- DÉTECTION PRIORITAIRE DES MENACES DE BRIDGE ADVERSES ---
-        def find_opponent_bridge_threats():
-            """Trouve les pions ADVERSES qui forment actuellement un bridge entre nos pions"""
-            threat_cells = set()
-            
-            for i in range(size):
-                for j in range(size):
-                    if board[i][j] == opp:  # <-- CHANGEMENT ICI : on cherche les pions ADVERSES
-                        # Compter les pions amis adjacents à ce pion adverse
-                        friend_neighbors = []
-                        for di, dj in dirs:
-                            ni, nj = i + di, j + dj
-                            if 0 <= ni < size and 0 <= nj < size and board[ni][nj] == my:
-                                friend_neighbors.append((ni, nj))
-                        
-                        # Si le pion adverse connecte exactement 2 pions amis
-                        if len(friend_neighbors) == 2:
-                            n1_i, n1_j = friend_neighbors[0]
-                            n2_i, n2_j = friend_neighbors[1]
-                            
-                            # Vérifier si ces deux pions amis ne sont pas adjacents entre eux
-                            are_adjacent = False
-                            for di, dj in dirs:
-                                if n1_i + di == n2_i and n1_j + dj == n2_j:
-                                    are_adjacent = True
-                                    break
-                            
-                            if not are_adjacent:
-                                # Ce pion adverse forme un bridge dangereux !
-                                # On doit jouer sur une case qui bloque cette connexion
-                                # Chercher les cases vides entre ces deux pions amis
-                                blocking_cells = set()
-                                
-                                # Chercher les cases qui sont entre les deux pions amis
-                                # Ces cases doivent être adjacentes aux DEUX pions amis
-                                for di1, dj1 in dirs:
-                                    # Case adjacente au premier pion ami
-                                    ci, cj = n1_i + di1, n1_j + dj1
-                                    if 0 <= ci < size and 0 <= cj < size and board[ci][cj] == 0:
-                                        # Vérifier si cette case est aussi adjacente au deuxième pion ami
-                                        for di2, dj2 in dirs:
-                                            if ci == n2_i + di2 and cj == n2_j + dj2:
-                                                # Cette case est adjacente aux DEUX pions amis !
-                                                blocking_cells.add((ci, cj))
-                                
-                                threat_cells |= blocking_cells
-            
-            return threat_cells
-
-        # VÉRIFICATION PRIORITAIRE - AVANT TOUTE AUTRE LOGIQUE
-        threat_cells = find_opponent_bridge_threats()
-        if threat_cells:
-            # Prendre la première menace trouvée (ou on peut choisir une stratégie)
-            desired_threat = random.choice(list(threat_cells))
-            # Trouver l'action correspondante
-            for a in possible_actions:
-                if action_places_on(a, desired_threat):
-                    
-                    return a
 
         # --- cellules centrales utilitaire ---
         def get_central_cells(sz, target=12):
@@ -225,8 +187,10 @@ class MyPlayer(PlayerHex):
             # R premier coup -> choisir une cellule "centrée mais orientée" vers notre objectif
             if my == "R" and occupied == 0:
                 mid = size // 2
-                # préférence pour avancer rapidement : 4 lignes vers notre bord (bas)
-                pref = (min(size - 1, mid + 4), mid)
+                # Choisir une case centrale aléatoire parmi les plus centrales
+                central_options = [(mid, mid), (mid+1, mid), (mid-1, mid), (mid, mid+1), (mid, mid-1)]
+                random.shuffle(central_options)
+                pref = central_options[0]
                 if 0 <= pref[0] < size and 0 <= pref[1] < size and board[pref[0]][pref[1]] == 0:
                     for a in possible_actions:
                         if action_places_on(a, pref):
@@ -244,29 +208,16 @@ class MyPlayer(PlayerHex):
                     if board[cand[0]][cand[1]] != 0:
                         self._center_played = True
 
-            # B reacting to opponent's first move
+            # B reacting to single R move: place on R's column ~4 towards center
             elif my == "B" and occupied == 1:
                 opp_cells = [(i, j) for i in range(size) for j in range(size) if board[i][j] == opp]
                 if opp_cells:
                     oi, oj = opp_cells[0]
                     ci = (size - 1) / 2.0
-                    
-                    # DÉTERMINER SI L'ADVERSAIRE A JOUÉ AU CENTRE OU SUR LES CÔTÉS
-                    center_threshold = size * 0.3  # 30% du board depuis le centre
-                    is_opponent_center = (abs(oi - ci) <= center_threshold and 
-                                        abs(oj - ci) <= center_threshold)
-                    
-                    if is_opponent_center:
-                        # Si adversaire au centre : jouer à 4 cases de lui vers le centre
-                        dir_i = 1 if oi < ci else -1
-                        target_i = oi + 4 * dir_i
-                        target_i = max(0, min(size - 1, int(round(target_i))))
-                        pref = (target_i, oj)
-                    else:
-                        # Si adversaire sur les côtés : jouer au centre nous-mêmes
-                        mid = size // 2
-                        pref = (mid, mid)
-                    
+                    dir_i = 1 if oi < ci else -1
+                    target_i = oi + 4 * dir_i
+                    target_i = max(0, min(size - 1, int(round(target_i))))
+                    pref = (target_i, oj)
                     if 0 <= pref[0] < size and 0 <= pref[1] < size and board[pref[0]][pref[1]] == 0:
                         for a in possible_actions:
                             if action_places_on(a, pref):
@@ -274,7 +225,6 @@ class MyPlayer(PlayerHex):
                                 self._focus_column = oj
                                 self._focus_row = oi
                                 return a
-                    
                     # fallback: central cell closest to pref
                     if central_empty:
                         central_empty.sort(key=lambda c: abs(c[0] - pref[0]) + abs(c[1] - pref[1]))
@@ -296,15 +246,14 @@ class MyPlayer(PlayerHex):
                 if board[desired_center[0]][desired_center[1]] != 0:
                     self._center_played = True
 
-      
+        # --- 0-1 BFS helpers (nos pions coût 0, vides coût 1, adversaire bloqué) ---
+        dirs = [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0)]
 
         def bfs_from_starts(starts, is_target):
             INF = 10**9
             dist = {}
             prev = {}
-            direction_state = {}  # État de direction pour chaque case
             dq = deque()
-            
             for s in starts:
                 i, j = s
                 if not (0 <= i < size and 0 <= j < size):
@@ -315,23 +264,16 @@ class MyPlayer(PlayerHex):
                 if dist.get((i, j), INF) > cost:
                     dist[(i, j)] = cost
                     prev[(i, j)] = None
-                    direction_state[(i, j)] = True  # Commence avec True = même ligne/colonne
                     if cost == 0:
                         dq.appendleft((i, j))
                     else:
                         dq.append((i, j))
-            
             reached_targets = []
             best_target_cost = INF
-            
             while dq:
                 u = dq.popleft()
-                ui, uj = u
-                current_state = direction_state.get(u, True)
-                
                 if dist.get(u, INF) > best_target_cost:
                     continue
-                    
                 if is_target(u):
                     c = dist.get(u, INF)
                     if c < best_target_cost:
@@ -340,53 +282,23 @@ class MyPlayer(PlayerHex):
                     elif c == best_target_cost:
                         reached_targets.append(u)
                     continue
-                
+                ui, uj = u
                 du = dist.get(u, INF)
-                
                 for di, dj in dirs:
                     vi, vj = ui + di, uj + dj
                     if not (0 <= vi < size and 0 <= vj < size):
                         continue
                     if board[vi][vj] == opp:
                         continue
-                        
-                    # VÉRIFICATION DE LA CONTRAINTE DE DIRECTION
-                    valid_direction = False
-                    
-                    if my == "R":
-                        # R : True = même colonne (même j), False = changer de colonne
-                        if current_state:  # Doit rester sur même colonne
-                            if vj == uj:  # Même colonne
-                                valid_direction = True
-                        else:  # Doit changer de colonne
-                            if vj != uj:  # Colonne différente
-                                valid_direction = True
-                    else:  # "B"
-                        # B : True = même ligne (même i), False = changer de ligne
-                        if current_state:  # Doit rester sur même ligne
-                            if vi == ui:  # Même ligne
-                                valid_direction = True
-                        else:  # Doit changer de ligne
-                            if vi != ui:  # Ligne différente
-                                valid_direction = True
-                    
-                    if not valid_direction:
-                        continue
-                        
                     w = 0 if board[vi][vj] == my else 1
                     nd = du + w
-                    
                     if nd < dist.get((vi, vj), INF):
                         dist[(vi, vj)] = nd
                         prev[(vi, vj)] = (ui, uj)
-                        # ALTERNANCE : Inverse l'état pour la prochaine case
-                        direction_state[(vi, vj)] = not current_state
-                        
                         if w == 0:
                             dq.appendleft((vi, vj))
                         else:
                             dq.append((vi, vj))
-            
             return reached_targets, best_target_cost, prev, dist
 
         # --- préparer deux recherches (sens A et B) ---
@@ -432,8 +344,6 @@ class MyPlayer(PlayerHex):
                 for idx, (pi, pj) in enumerate(path):
                     if board[pi][pj] == 0:
                         first_empty_idx = idx
-                        
-
                         # Vérifier si on peut avancer d'une case supplémentaire
                         next_idx = idx + 1
                         if next_idx < len(path):
@@ -505,6 +415,7 @@ class MyPlayer(PlayerHex):
                                 bridge_candidates.add((i, j))
             
             return bridge_candidates
+        
         
 
         # --- alternance forcée des côtés (sauf si côté "bien rempli") ---
@@ -686,5 +597,3 @@ class MyPlayer(PlayerHex):
                     neighbors.append((ni, nj))
 
         return neighbors
-
-
