@@ -18,7 +18,7 @@ class MyPlayer(PlayerHex):
         super().__init__(piece_type, name)
         self._max_depth = 2
         self._start_time = 0
-        self._time_limit = 900.0
+        self._time_limit = 20.0
 
         self._dirs = [(-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0)]
         self._bridge_patterns = {
@@ -88,9 +88,9 @@ class MyPlayer(PlayerHex):
 
         my = self.piece_type
         opp = "R" if my == "B" else "B"
-
         return - self.hex_distance(board, size, my) + self.hex_distance(board, size, opp)
 
+    
     def hex_distance(self, board, size, player):
         opponent = "R" if player == "B" else "B"
 
@@ -158,6 +158,82 @@ class MyPlayer(PlayerHex):
 
         return best
     
+    def get_action_coords(self, state, action):
+            """
+            Devine les coordonnées (x,y) jouées par action en comparant l’état
+            avant et après l'application.
+            Compatible avec Hex.
+            """
+            rep_before = state.get_rep()
+            board_before, size = self.extract_board(rep_before)
+
+            # Appliquer temporairement l'action
+            next_state = state.apply_action(action)
+            rep_after = next_state.get_rep()
+            board_after, _ = self.extract_board(rep_after)
+
+            # Trouver la case qui a changé
+            for i in range(size):
+                for j in range(size):
+                    if board_before[i][j] != board_after[i][j]:
+                        return (i, j)
+
+            # En dernier recours : action ne modifie rien ou structure différente
+            raise RuntimeError("Impossible de déterminer les coordonnées d’un coup Hex.")
+    
+    def order_moves(self, state, actions):
+        """
+        Renvoie les moves triés selon une heuristique dynamique :
+        - début de partie : privilégie centre + éloignement
+        - fin de partie : privilégie connexité
+        """
+        rep = state.get_rep()
+        board, size = self.extract_board(rep)
+
+        # Compter le nombre de coups déjà joués
+        filled = sum(board[i][j] != 0 for i in range(size) for j in range(size))
+        progress = 1 - math.exp(-filled / (size * 0.2))     # 0 = début / 1 = fin
+
+        cx = cy = (size - 1) / 2
+
+        # Récupérer positions actuelles de chaque joueur
+        my = self.piece_type
+        opp = "R" if my == "B" else "B"
+        my_stones = [(i, j) for i in range(size) for j in range(size) if board[i][j] == my]
+        opp_stones = [(i, j) for i in range(size) for j in range(size) if board[i][j] == opp]
+
+        def dist(a, b):
+            (x1, y1), (x2, y2) = a, b
+            return abs(x1 - x2) + abs(y1 - y2)
+    
+        def score_move(action):
+            x, y = self.get_action_coords(state, action)
+
+            # Proximité du centre (fort au début, faible à la fin)
+            center_score = -math.sqrt((x - cx)**2 + (y - cy)**2)
+            center_weight = 1 - progress
+
+            # Connexité : se rapprocher de mes pierres en fin de partie
+            if my_stones:
+                min_dist_connect = min(dist((x, y), s) for s in my_stones)
+            else:
+                min_dist_connect = 0
+            connect_weight = progress       # plus important en fin de partie
+
+            adj_bonus = 0
+            for dx, dy in self._dirs:
+                nx, ny = x+dx, y+dy
+                if 0 <= nx < size and 0 <= ny < size and board[nx][ny] == my:
+                    adj_bonus += 4 * progress
+
+            return (
+                center_weight * center_score +
+                connect_weight * min_dist_connect +
+                adj_bonus
+            )
+
+        return sorted(actions, key=score_move, reverse=True)
+    
     def minimax(self, state, depth, alpha, beta, maximizing):
         if self.time_is_up():
             raise TimeoutError
@@ -165,7 +241,7 @@ class MyPlayer(PlayerHex):
         if depth == 0 or state.is_done():
             return self.evaluate_state(state), None
 
-        actions = state.get_possible_light_actions()
+        actions = self.order_moves(state, state.get_possible_light_actions())
         if not actions:
             return self.evaluate_state(state), None
 
@@ -213,10 +289,36 @@ class MyPlayer(PlayerHex):
             return actions[0]
         
         best_action = None
+        depth = 1
 
         # appel du minimax
         try:
-            _, best_action = self.minimax(current_state, depth=self._max_depth, alpha=-float("inf"), beta=float("inf"), maximizing=True)
+            while True:
+                # Test si le temps est presque écoulé avant de lancer la profondeur suivante
+                if self.time_is_up():
+                    break
+
+                # Minimax avec move ordering
+                value, action = self.minimax(
+                    current_state,
+                    depth=depth,
+                    alpha=-float("inf"),
+                    beta=float("inf"),
+                    maximizing=True
+                )
+
+                # Si minimax a fourni un coup valide, on le garde
+                if action is not None:
+                    best_action = action
+
+                depth += 1    # On augmente la profondeur pour le prochain cycle
+
         except TimeoutError:
+            # On revient au dernier coup stable trouvé
             pass
-        return best_action if best_action  else random.choice(list(actions))
+
+        # Si jamais rien n'a été trouvé, fallback
+        if best_action is None:
+            best_action = random.choice(list(actions))
+
+        return best_action
