@@ -18,7 +18,7 @@ class MyPlayer(PlayerHex):
         super().__init__(piece_type, name)
         self._max_depth = 2
         self._start_time = 0
-        self._time_limit = 20.0
+        self._time_limit = 10.0
 
         self._dirs = [(-1,0), (-1,1), (0,-1), (0,1), (1,-1), (1,0)]
         self._bridge_patterns = {
